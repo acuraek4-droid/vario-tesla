@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tarif VARIO Groupe E + Tesla</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root{
+    --bg:#f6f8fa; --card:#fff; --text:#222; --muted:#667; --ok:#1e7f1e; --warn:#c73a3a; --accent:#0b6bff;
+    --low-bg: rgba(40,200,40,.12); --mid-bg: rgba(255,200,0,.12); --high-bg: rgba(255,80,80,.12);
+    --table-border: rgba(128,128,128,.2); --chosen: 2px solid #6cc06c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1115; --card:#151924; --text:#e6e6e6; --muted:#9aa3b2; --ok:#65d665; --warn:#ff6b6b; --accent:#62a0ff;
+      --low-bg: rgba(40,200,40,.18); --mid-bg: rgba(255,200,0,.18); --high-bg: rgba(255,80,80,.18);
+      --table-border: rgba(255,255,255,.12); --chosen: 2px solid #80e080;
+    }
+  }
+  body{ font-family: system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text); margin:0; padding:16px; text-align:center;}
+  h1{ margin:.2rem 0 .6rem; }
+  .muted{ color:var(--muted); }
+  .wrap{ max-width:980px; margin:0 auto; }
+  .card{ background:var(--card); border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.08); padding:14px; margin:12px auto; text-align:left;}
+  .grid{ display:grid; gap:12px; grid-template-columns:1fr; }
+  @media(min-width:740px){ .grid{ grid-template-columns:1fr 1fr; } }
+  canvas{ width:100% !important; height:auto !important; }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ padding:6px 8px; border-bottom:1px solid var(--table-border); text-align:center; }
+  tr.low td{ background:var(--low-bg); }
+  tr.mid td{ background:var(--mid-bg); }
+  tr.high td{ background:var(--high-bg); }
+  tr.chosen td{ border-bottom: var(--chosen); }
+  .kpi{ display:flex; align-items:center; gap:8px; margin:.25rem 0; }
+  .dot{ width:10px; height:10px; border-radius:50%; background:var(--ok); display:inline-block;}
+  .btn{ background:var(--accent); color:#fff; border:0; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer;}
+  .btn:disabled{ opacity:.6; cursor:default;}
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  input, select{ width:100%; padding:10px; border-radius:10px; border:1px solid var(--table-border); background:transparent; color:var(--text); }
+  label{ font-size:.92rem; color:var(--muted); display:block; margin-bottom:4px;}
+  .check{ display:flex; align-items:center; gap:8px; margin-top:6px;}
+  .good{ color:var(--ok); } .bad{ color:var(--warn); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tarif VARIO Groupe E – Prix du jour</h1>
+  <div id="dateJour" class="muted"></div>
+  <div class="muted" id="lastUpdate">Chargement…</div>
+
+  <div class="card">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="grid">
+    <div class="card" id="stats"></div>
+
+    <div class="card">
+      <h3>⚡ Simulateur de charge – Tesla</h3>
+      <p class="muted" style="margin-top:-6px">Calcule durée, coût et créneau optimal (jour ou nuit).</p>
+      <div class="row">
+        <div>
+          <label>% batterie actuel</label>
+          <input id="socNow" type="number" min="0" max="100" value="27" />
+        </div>
+        <div>
+          <label>Objectif %</label>
+          <input id="socTarget" type="number" min="10" max="100" value="80" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label>Puissance chargeur (kW)</label>
+          <input id="powerKw" type="number" step="0.1" min="1" value="11" />
+        </div>
+        <div>
+          <label>Capacité utilisable (kWh)</label>
+          <input id="usableKwh" type="number" step="0.1" min="40" value="78" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label>Rendement (pertes)</label>
+          <select id="eff">
+            <option value="0.93" selected>93 %</option>
+            <option value="0.95">95 %</option>
+            <option value="0.90">90 %</option>
+          </select>
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="mode">
+            <option value="day" selected>Optimiser aujourd’hui (00:00→24:00)</option>
+            <option value="night">Recharge de nuit (18:00→07:00)</option>
+          </select>
+        </div>
+      </div>
+      <div class="check">
+        <input id="contig" type="checkbox" />
+        <label for="contig">Préférer une fenêtre continue (au lieu de créneaux épars)</label>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+        <button class="btn" id="btnPlan">Calculer le meilleur créneau</button>
+        <span class="muted">Seuils : <b>&lt;0.20</b> vert • <b>0.20–0.30</b> jaune • <b>&gt;0.30</b> rouge (CHF/kWh)</span>
+      </div>
+      <div id="planOut" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📅 Prix de demain</h3>
+    <div id="demain" class="muted">Les prix de demain sont publiés ~18h. Cette section se remplit automatiquement si disponible.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const LOW = 0.20, HIGH = 0.30; // seuils couleurs
+  const prox = u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u);
+
+  // helpers
+  const pad = n => String(n).padStart(2,'0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  // heure d'été/hiver CH auto
+  const isDST = (d=new Date())=>{
+    const jan=new Date(d.getFullYear(),0,1).getTimezoneOffset();
+    const jul=new Date(d.getFullYear(),6,1).getTimezoneOffset();
+    return Math.min(jan,jul) !== d.getTimezoneOffset();
+  };
+  const tzOffset = isDST() ? "+02:00" : "+01:00";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+  const overmorrow = new Date(tomorrow); overmorrow.setDate(tomorrow.getDate()+1);
+
+  const startToday = `${ymd(today)}T00:00:00${tzOffset}`;
+  const endToday   = `${ymd(tomorrow)}T00:00:00${tzOffset}`;
+  const apiToday   = `https://api.tariffs.groupe-e.ch/v1/tariffs?start_timestamp=${startToday}&end_timestamp=${endToday}`;
+
+  const startTom = `${ymd(tomorrow)}T00:00:00${tzOffset}`;
+  const endTom   = `${ymd(overmorrow)}T00:00:00${tzOffset}`;
+  const apiTomorrow = `https://api.tariffs.groupe-e.ch/v1/tariffs?start_timestamp=${startTom}&end_timestamp=${endTom}`;
+
+  document.getElementById("dateJour").textContent =
+    today.toLocaleDateString('fr-CH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  let dataToday = [], dataTomorrow = [], chartRef = null;
+
+  function chf(x){ return +(x/100).toFixed(3); }
+  function slotToObj(d){
+    return { t1: new Date(d.start_timestamp), t2: new Date(d.end_timestamp), p: chf(d.vario_plus) };
+  }
+
+  function drawChart(data){
+    const labels = data.map(d => new Date(d.start_timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+    const prices = data.map(d => chf(d.vario_plus));
+    // masques couleurs
+    const green = prices.map(v => (v < LOW) ? v : null);
+    const yellow= prices.map(v => (v >= LOW && v <= HIGH) ? v : null);
+    const red   = prices.map(v => (v > HIGH) ? v : null);
+
+    const ctx = document.getElementById("chart").getContext("2d");
+    // ⚠️ IMPORTANT : pas de fill sur la ligne principale + pas de bordure sur couches colorées
+    chartRef = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { // zones vertes
+            label:"<0.20",
+            data: green,
+            borderColor:"transparent",
+            borderWidth:0,
+            backgroundColor:"rgba(24,160,24,0.28)",
+            tension:0.25, pointRadius:0, fill:true, order:0
+          },
+          { // zones jaunes
+            label:"0.20–0.30",
+            data: yellow,
+            borderColor:"transparent",
+            borderWidth:0,
+            backgroundColor:"rgba(255,200,0,0.25)",
+            tension:0.25, pointRadius:0, fill:true, order:-1
+          },
+          { // zones rouges
+            label:">0.30",
+            data: red,
+            borderColor:"transparent",
+            borderWidth:0,
+            backgroundColor:"rgba(220,80,80,0.25)",
+            tension:0.25, pointRadius:0, fill:true, order:-2
+          },
+          { // ligne principale (bleue) SANS fill ⇒ supprime les lignes verticales parasites
+            label:"CHF/kWh",
+            data: prices,
+            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || "#0b6bff",
+            backgroundColor: "transparent",
+            tension: 0.25,
+            pointRadius: 3,
+            fill: false,
+            borderWidth: 2,
+            order: 10
+          }
+        ]
+      },
+      options: {
+        interaction:{ mode:'nearest', axis:'x', intersect:false },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{
+            enabled:true,
+            mode:'nearest',
+            intersect:false,
+            callbacks:{ label:(c)=>` ${c.parsed.y.toFixed(3)} CHF/kWh` }
+          }
+        },
+        scales:{ y:{beginAtZero:true, title:{display:true,text:"CHF/kWh"}}, x:{title:{display:true,text:"Heure"}} },
+        // 🖱️ clic : déplace automatiquement le tooltip vers le nouveau point
+        onClick:(evt, el, chart) => {
+          const points = chart.getElementsAtEventForMode(evt,'nearest',{axis:'x',intersect:false},true);
+          if (!points.length) return;
+          const idx = points[0].index;
+          // on force l’activation sur la ligne principale (dernier dataset)
+          const baseDatasetIndex = chart.data.datasets.length - 1;
+          const active = [{ datasetIndex: baseDatasetIndex, index: idx }];
+          chart.setActiveElements(active);
+          chart.tooltip.setActiveElements(active);
+          chart.update();
+        }
+      }
+    });
+  }
+
+  function buildStats(data){
+    const arr = data.map(slotToObj);
+    const avg = +(arr.reduce((s,a)=>s+a.p,0) / arr.length).toFixed(3);
+    const sorted = [...arr].sort((a,b)=>a.p-b.p);
+    const top3 = sorted.slice(0,3);
+    const worst3 = sorted.slice(-3).reverse();
+    const under = arr.filter(x => x.p < LOW).sort((a,b)=>a.t1-b.t1);
+
+    const line = (x)=>x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    let html = `<h3>📊 Statistiques du jour</h3>`;
+    html += `<div class="kpi"><span class="dot" style="background:var(--accent)"></span><b>Moyenne journalière :</b>&nbsp;${avg} CHF/kWh</div>`;
+    html += `<table><tr><th colspan="2">🟢 3 périodes les moins chères</th></tr>`;
+    top3.forEach(x => html += `<tr class="low"><td>${line(x.t1)}</td><td>${x.p.toFixed(3)}</td></tr>`);
+    html += `<tr><th colspan="2">🔺 3 périodes les plus chères</th></tr>`;
+    worst3.forEach(x => html += `<tr class="high"><td>${line(x.t1)}</td><td>${x.p.toFixed(3)}</td></tr>`);
+    html += `<tr><th colspan="2">💡 Périodes sous ${LOW.toFixed(2)} CHF/kWh</th></tr>`;
+    if (under.length){
+      under.forEach(x => html += `<tr class="low"><td>${line(x.t1)}</td><td>${x.p.toFixed(3)}</td></tr>`);
+    } else {
+      html += `<tr><td colspan="2">Aucune période sous ${LOW.toFixed(2)} CHF/kWh</td></tr>`;
+    }
+    html += `</table>`;
+    document.getElementById("stats").innerHTML = html;
+  }
+
+  function showNowPrice(data){
+    const nowMs = Date.now();
+    const slot = data.find(d => {
+      const a = new Date(d.start_timestamp).getTime();
+      const b = new Date(d.end_timestamp).getTime();
+      return nowMs >= a && nowMs < b;
+    });
+    const priceNow = slot ? chf(slot.vario_plus).toFixed(3) : "?";
+    document.getElementById("lastUpdate").textContent =
+      `Dernière mise à jour : ${new Date().toLocaleTimeString()} — Prix actuel : ${priceNow} CHF/kWh`;
+  }
+
+  // --- Simulateur : fenêtres jour/nuit 18→07 + continu/épars ---
+  function allowedSlots(mode){
+    const allToday = dataToday.map(slotToObj);
+    const allTom   = Array.isArray(dataTomorrow) ? dataTomorrow.map(slotToObj) : [];
+
+    if (mode === "day"){
+      return allToday;
+    } else {
+      const t18 = new Date(today); t18.setHours(18,0,0,0);
+      const t24 = new Date(today); t24.setHours(24,0,0,0);
+      const t07 = new Date(tomorrow); t07.setHours(7,0,0,0);
+      const eve = allToday.filter(x => x.t1 >= t18 && x.t1 < t24);
+      const morn= allTom.filter(x => x.t1 >= new Date(tomorrow) && x.t1 < t07);
+      return eve.concat(morn);
+    }
+  }
+
+  function planBest(){
+    const socNow = Math.max(0, Math.min(100, +document.getElementById('socNow').value || 0));
+    const socTarget = Math.max(0, Math.min(100, +document.getElementById('socTarget').value || 80));
+    const power = Math.max(1, +document.getElementById('powerKw').value || 11);
+    const usable = Math.max(40, +document.getElementById('usableKwh').value || 78);
+    const eff = Math.max(0.80, Math.min(0.99, +document.getElementById('eff').value || 0.93));
+    const mode = document.getElementById('mode').value;
+    const wantContig = document.getElementById('contig').checked;
+
+    if (socTarget <= socNow){
+      document.getElementById('planOut').innerHTML = `<p class="good">La batterie est déjà ≥ l’objectif.</p>`;
+      return;
+    }
+
+    const energyBattery = usable * (socTarget - socNow) / 100; // kWh visés dans la batterie
+    const energyAtPlug  = energyBattery / eff;                 // kWh à fournir à la prise
+    const slotKwh = power * 0.25; // 15 min
+    const N = Math.ceil(energyAtPlug / slotKwh);
+
+    const slots = allowedSlots(mode);
+    if (!slots.length){
+      document.getElementById('planOut').innerHTML =
+        `<p class="bad">Aucune donnée disponible pour cette fenêtre (ex. demain non publié avant ~18h).</p>`;
+      return;
+    }
+
+    let chosen = [];
+    if (!wantContig){
+      chosen = [...slots].sort((a,b)=>a.p-b.p).slice(0, N).sort((a,b)=>a.t1-b.t1);
+    } else {
+      let bestAvg = Infinity, bestIdx = -1;
+      for (let i=0; i+N<=slots.length; i++){
+        let sum=0; for (let k=0;k<N;k++) sum += slots[i+k].p;
+        const avg = sum/N;
+        if (avg < bestAvg){ bestAvg=avg; bestIdx=i; }
+      }
+      if (bestIdx>=0) chosen = slots.slice(bestIdx, bestIdx+N);
+    }
+
+    const kWhDelivered = Math.min(chosen.length*slotKwh, energyAtPlug);
+    const cost = chosen.reduce((s,a)=> s + a.p * slotKwh, 0);
+    const first = chosen[0]?.t1, last = chosen[chosen.length-1]?.t2;
+
+    const rows = slots.map(s=>{
+      const cls = s.p<LOW ? 'low' : s.p>HIGH ? 'high' : 'mid';
+      const used = chosen.includes(s) ? ' chosen' : '';
+      return `<tr class="${cls}${used}"><td>${s.t1.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td>${s.p.toFixed(3)}</td></tr>`;
+    }).join("");
+
+    let extra = "";
+    if (chosen.length < N){
+      extra = `<p class="bad">⚠️ Fenêtre incomplète (${N - chosen.length} créneau(x) manquant). Compléter sur la prochaine publication.</p>`;
+    }
+
+    document.getElementById('planOut').innerHTML = `
+      <div class="card">
+        <b>Mode :</b> ${mode==="night"?"Nuit 18:00→07:00":"Jour 00:00→24:00"} — <b>${wantContig?"Fenêtre continue":"Créneaux les moins chers"}</b><br/>
+        <b>Énergie batterie visée :</b> ${energyBattery.toFixed(1)} kWh — <b>À la prise (rendement ${Math.round(eff*100)}%) :</b> ${energyAtPlug.toFixed(1)} kWh<br/>
+        <b>Puissance :</b> ${power} kW → <b>par créneau 15 min :</b> ${slotKwh.toFixed(2)} kWh<br/>
+        <b>Créneaux requis :</b> ${N}
+        ${extra}
+        <hr/>
+        <b>Fenêtre recommandée :</b> ${first?first.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):"—"} → ${last?last.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):"—"}<br/>
+        <b>kWh chargés aujourd’hui/nuit :</b> ${kWhDelivered.toFixed(1)} kWh<br/>
+        <b>Coût estimé :</b> ${cost.toFixed(2)} CHF
+        <details style="margin-top:8px">
+          <summary>Voir la fenêtre complète & le détail des prix</summary>
+          <table><tr><th>Début</th><th>Prix (CHF/kWh)</th></tr>${rows}</table>
+          <p class="muted">Les lignes <span class="low">vertes</span> &lt; ${LOW.toFixed(2)}, <span class="mid">jaunes</span> entre ${LOW.toFixed(2)}–${HIGH.toFixed(2)}, et <span class="high">rouges</span> &gt; ${HIGH.toFixed(2)}. Les lignes avec bordure sont les créneaux retenus.</p>
+        </details>
+      </div>
+    `;
+  }
+
+  // charge données + init
+  Promise.all([
+    fetch(prox(apiToday)).then(r=>r.json()),
+    fetch(prox(apiTomorrow)).then(r=> r.ok ? r.json() : [] )
+  ]).then(([d1,d2])=>{
+    dataToday = d1 || [];
+    dataTomorrow = d2 || [];
+
+    drawChart(dataToday);
+    buildStats(dataToday);
+    showNowPrice(dataToday);
+
+    const demainDiv = document.getElementById('demain');
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length){
+      demainDiv.textContent = "✅ Les prix de demain sont disponibles sur l’API (intégrés au mode Nuit).";
+    } else {
+      demainDiv.textContent = "Les prix de demain seront publiés vers 18h.";
+    }
+
+    // ▶️ (ré)attache le simulateur
+    document.getElementById('btnPlan').addEventListener('click', planBest);
+  }).catch(err=>{
+    document.getElementById("lastUpdate").textContent = "Erreur de chargement des données ⚠️";
+    console.error(err);
+  });
+})();
+</script>
+</body>
+</html>
