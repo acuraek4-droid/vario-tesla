@@ -21,10 +21,11 @@
   body{ font-family: system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text); margin:0; padding:16px; text-align:center;}
   h1{ margin:.2rem 0 .6rem; }
   .muted{ color:var(--muted); }
-  .wrap{ max-width:980px; margin:0 auto; }
+  .wrap{ max-width:1200px; margin:0 auto; }
   .card{ background:var(--card); border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.08); padding:14px; margin:12px auto; text-align:left;}
-  .grid{ display:grid; gap:12px; grid-template-columns:1fr; }
-  @media(min-width:740px){ .grid{ grid-template-columns:1fr 1fr; } }
+  .grid2{ display:grid; gap:12px; grid-template-columns:1fr; }
+  @media(min-width:900px){ .grid2{ grid-template-columns:1fr 1fr; } }
+  .full{ grid-column: 1 / -1; }
   canvas{ width:100% !important; height:auto !important; }
   table{ width:100%; border-collapse:collapse; }
   th,td{ padding:6px 8px; border-bottom:1px solid var(--table-border); text-align:center; }
@@ -41,6 +42,7 @@
   label{ font-size:.92rem; color:var(--muted); display:block; margin-bottom:4px;}
   .check{ display:flex; align-items:center; gap:8px; margin-top:6px;}
   .good{ color:var(--ok); } .bad{ color:var(--warn); }
+  .center{ text-align:center; }
 </style>
 </head>
 <body>
@@ -49,73 +51,95 @@
   <div id="dateJour" class="muted"></div>
   <div class="muted" id="lastUpdate">Chargement…</div>
 
-  <div class="card">
-    <canvas id="chart"></canvas>
-    <!-- Légende du tarif Double PLUS -->
-    <div id="tarifDoublePlus" class="muted" style="text-align:center; margin-top:8px">
-      🔸 <b>Tarif Double PLUS</b> — tracé orange constant<br>
-      🕖 Jour (07h00 → 21h00) → 31.65 ct/kWh (= 0.3165 CHF/kWh) •
-      🌙 Nuit (21h00 → 07h00) → 21.3 ct/kWh (= 0.213 CHF/kWh)
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card" id="stats"></div>
-
+  <!-- ====== LIGNE 1 : Graphiques aujourd'hui / demain ====== -->
+  <div class="grid2">
+    <!-- Aujourd'hui -->
     <div class="card">
-      <h3>⚡ Simulateur de charge – Tesla</h3>
-      <p class="muted" style="margin-top:-6px">Calcule durée, coût et créneau optimal (jour ou nuit).</p>
-      <div class="row">
-        <div>
-          <label>% batterie actuel</label>
-          <input id="socNow" type="number" min="0" max="100" value="27" />
-        </div>
-        <div>
-          <label>Objectif %</label>
-          <input id="socTarget" type="number" min="10" max="100" value="80" />
-        </div>
+      <h3 id="titleToday" class="center">Aujourd’hui</h3>
+      <canvas id="chartToday"></canvas>
+      <div class="muted center" style="margin-top:8px">
+        🔸 <b>Tarif Double PLUS</b> — tracé orange constant<br>
+        🕖 Jour (07h00 → 21h00) → 0.3165 CHF/kWh • 🌙 Nuit (21h00 → 07h00) → 0.213 CHF/kWh
       </div>
-      <div class="row" style="margin-top:8px">
-        <div>
-          <label>Puissance chargeur (kW)</label>
-          <input id="powerKw" type="number" step="0.1" min="1" value="11" />
-        </div>
-        <div>
-          <label>Capacité utilisable (kWh)</label>
-          <input id="usableKwh" type="number" step="0.1" min="40" value="78" />
-        </div>
+    </div>
+
+    <!-- Demain -->
+    <div class="card">
+      <h3 id="titleTomorrow" class="center">Demain</h3>
+      <canvas id="chartTomorrow"></canvas>
+      <div class="muted center" id="tomHint" style="margin-top:8px">
+        En attente de publication (~18h). La courbe s’affiche automatiquement dès que disponible.
       </div>
-      <div class="row" style="margin-top:8px">
-        <div>
-          <label>Rendement (pertes)</label>
-          <select id="eff">
-            <option value="0.93" selected>93 %</option>
-            <option value="0.95">95 %</option>
-            <option value="0.90">90 %</option>
-          </select>
-        </div>
-        <div>
-          <label>Mode</label>
-          <select id="mode">
-            <option value="day" selected>Optimiser aujourd’hui (00:00→24:00)</option>
-            <option value="night">Recharge de nuit (18:00→07:00)</option>
-          </select>
-        </div>
+      <div class="muted center" style="margin-top:8px">
+        🔸 <b>Tarif Double PLUS</b> — tracé orange constant (même barème que ci-contre)
       </div>
-      <div class="check">
-        <input id="contig" type="checkbox" />
-        <label for="contig">Préférer une fenêtre continue (au lieu de créneaux épars)</label>
-      </div>
-      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
-        <button class="btn" id="btnPlan">Calculer le meilleur créneau</button>
-        <span class="muted">Seuils : <b>&lt;0.20</b> vert • <b>0.20–0.30</b> jaune • <b>&gt;0.30</b> rouge (CHF/kWh)</span>
-      </div>
-      <div id="planOut" style="margin-top:10px"></div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>📅 Prix de demain</h3>
+  <!-- ====== LIGNE 2 : Statistiques aujourd’hui / demain ====== -->
+  <div class="grid2">
+    <div class="card" id="statsToday"></div>
+    <div class="card" id="statsTomorrow"></div>
+  </div>
+
+  <!-- Comparaison sous les statistiques -->
+  <div class="card full center" id="compareBox" style="display:none"></div>
+
+  <!-- ====== LIGNE 3 : Simulateur centré ====== -->
+  <div class="card full">
+    <h3 class="center">⚡ Simulateur de charge – Tesla</h3>
+    <p class="muted center" style="margin-top:-6px">Calcule durée, coût et créneau optimal (jour ou nuit).</p>
+    <div class="row">
+      <div>
+        <label>% batterie actuel</label>
+        <input id="socNow" type="number" min="0" max="100" value="27" />
+      </div>
+      <div>
+        <label>Objectif %</label>
+        <input id="socTarget" type="number" min="10" max="100" value="80" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label>Puissance chargeur (kW)</label>
+        <input id="powerKw" type="number" step="0.1" min="1" value="11" />
+      </div>
+      <div>
+        <label>Capacité utilisable (kWh)</label>
+        <input id="usableKwh" type="number" step="0.1" min="40" value="78" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label>Rendement (pertes)</label>
+        <select id="eff">
+          <option value="0.93" selected>93 %</option>
+          <option value="0.95">95 %</option>
+          <option value="0.90">90 %</option>
+        </select>
+      </div>
+      <div>
+        <label>Mode</label>
+        <select id="mode">
+          <option value="day" selected>Optimiser aujourd’hui (00:00→24:00)</option>
+          <option value="night">Recharge de nuit (18:00→07:00)</option>
+        </select>
+      </div>
+    </div>
+    <div class="check">
+      <input id="contig" type="checkbox" />
+      <label for="contig">Préférer une fenêtre continue (au lieu de créneaux épars)</label>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+      <button class="btn" id="btnPlan">Calculer le meilleur créneau</button>
+      <span class="muted">Seuils : <b>&lt;0.20</b> vert • <b>0.20–0.30</b> jaune • <b>&gt;0.30</b> rouge (CHF/kWh)</span>
+    </div>
+    <div id="planOut" style="margin-top:10px"></div>
+  </div>
+
+  <!-- Infos prix de demain (texte brut en secours) -->
+  <div class="card full">
+    <h3>📅 Prix bruts de demain (secours)</h3>
     <div id="demain" class="muted">Les prix de demain sont publiés ~18h. Cette section se remplit automatiquement si disponible.</div>
   </div>
 </div>
@@ -123,11 +147,13 @@
 <script>
 (function(){
   const LOW = 0.20, HIGH = 0.30; // seuils couleurs
+  const YMAX = 0.40;             // même échelle pour comparer
   const prox = u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u);
 
   // helpers
   const pad = n => String(n).padStart(2,'0');
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const prettyDate = d => d.toLocaleDateString('fr-CH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   // heure d'été/hiver CH auto
   const isDST = (d=new Date())=>{
@@ -150,30 +176,28 @@
   const endTom   = `${ymd(overmorrow)}T00:00:00${tzOffset}`;
   const apiTomorrow = `https://api.tariffs.groupe-e.ch/v1/tariffs?start_timestamp=${startTom}&end_timestamp=${endTom}`;
 
-  document.getElementById("dateJour").textContent =
-    today.toLocaleDateString('fr-CH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById("dateJour").textContent = prettyDate(today);
+  document.getElementById("titleToday").textContent = prettyDate(today);
+  document.getElementById("titleTomorrow").textContent = prettyDate(tomorrow);
 
-  let dataToday = [], dataTomorrow = [], chartRef = null;
+  let dataToday = [], dataTomorrow = [], chartTodayRef=null, chartTomorrowRef=null;
 
   function chf(x){ return +(x/100).toFixed(3); }
   function slotToObj(d){ return { t1:new Date(d.start_timestamp), t2:new Date(d.end_timestamp), p:chf(d.vario_plus) }; }
 
-  function drawChart(data){
+  // ==== DESSIN GRAPHIQUE GÉNÉRIQUE ====
+  function drawChartOn(canvasId, data){
     const labels = data.map(d => new Date(d.start_timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
     const prices = data.map(d => chf(d.vario_plus));
-    // masques couleurs
     const green = prices.map(v => (v < LOW) ? v : null);
     const yellow= prices.map(v => (v >= LOW && v <= HIGH) ? v : null);
     const red   = prices.map(v => (v > HIGH) ? v : null);
 
-    // Double PLUS: 07:00→21:00 = 0.3165, sinon 0.213
-    const doublePlus = data.map((d,i)=>{
-      const idx = i; // 15 min
-      return (idx >= 7*4 && idx < 21*4) ? 0.3165 : 0.213;
-    });
+    // Double PLUS 07:00→21:00 = 0.3165, sinon 0.213
+    const doublePlus = data.map((d,i)=> (i >= 7*4 && i < 21*4) ? 0.3165 : 0.213);
 
-    const ctx = document.getElementById("chart").getContext("2d");
-    chartRef = new Chart(ctx, {
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    const chart = new Chart(ctx, {
       type: "line",
       data: {
         labels,
@@ -197,7 +221,10 @@
             callbacks:{ label:(c)=>` ${c.parsed.y.toFixed(3)} CHF/kWh` }
           }
         },
-        scales:{ y:{beginAtZero:true, title:{display:true,text:"CHF/kWh"}}, x:{title:{display:true,text:"Heure"}} },
+        scales:{
+          y:{beginAtZero:true, suggestedMax:YMAX, max:YMAX, title:{display:true,text:"CHF/kWh"}},
+          x:{title:{display:true,text:"Heure"}}
+        },
         onClick:(evt, el, chart) => {
           const points = chart.getElementsAtEventForMode(evt,'nearest',{axis:'x',intersect:false},true);
           if (!points.length) return;
@@ -210,9 +237,11 @@
         }
       }
     });
+    return chart;
   }
 
-  function buildStats(data){
+  // ==== STATS GÉNÉRIQUES ====
+  function buildStatsInto(nodeId, data){
     const arr = data.map(slotToObj);
     const avg = +(arr.reduce((s,a)=>s+a.p,0) / arr.length).toFixed(3);
     const sorted = [...arr].sort((a,b)=>a.p-b.p);
@@ -221,8 +250,8 @@
     const under = arr.filter(x => x.p < LOW).sort((a,b)=>a.t1-b.t1);
 
     const line = (x)=>x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    let html = `<h3>📊 Statistiques du jour</h3>`;
-    html += `<div class="kpi"><span class="dot" style="background:var(--accent)"></span><b>Moyenne journalière :</b>&nbsp;${avg} CHF/kWh</div>`;
+    let html = `<h3>📊 Statistiques</h3>`;
+    html += `<div class="kpi"><span class="dot" style="background:var(--accent)"></span><b>Moyenne :</b>&nbsp;${avg} CHF/kWh</div>`;
     html += `<table><tr><th colspan="2">🟢 3 périodes les moins chères</th></tr>`;
     top3.forEach(x => html += `<tr class="low"><td>${line(x.t1)}</td><td>${x.p.toFixed(3)}</td></tr>`);
     html += `<tr><th colspan="2">🔺 3 périodes les plus chères</th></tr>`;
@@ -234,7 +263,9 @@
       html += `<tr><td colspan="2">Aucune période sous ${LOW.toFixed(2)} CHF/kWh</td></tr>`;
     }
     html += `</table>`;
-    document.getElementById("stats").innerHTML = html;
+    document.getElementById(nodeId).innerHTML = html;
+
+    return { avg };
   }
 
   function showNowPrice(data){
@@ -260,14 +291,12 @@
       const t18 = new Date(today); t18.setHours(18,0,0,0);
       const t24 = new Date(today); t24.setHours(24,0,0,0);
       const t07 = new Date(tomorrow); t07.setHours(7,0,0,0);
-
       const eve = allToday.filter(x => x.t1 >= t18 && x.t1 < t24);
       const morn= allTom.filter(x => x.t1 >= new Date(tomorrow) && x.t1 < t07);
       return eve.concat(morn);
     }
   }
 
-  // >>> VERSION COMPLÈTE (infos + tableau détaillé)
   function planBest(){
     const socNow = Math.max(0, Math.min(100, +document.getElementById('socNow').value || 0));
     const socTarget = Math.max(0, Math.min(100, +document.getElementById('socTarget').value || 80));
@@ -360,16 +389,48 @@
     dataToday = d1 || [];
     dataTomorrow = d2 || [];
 
-    drawChart(dataToday);
-    buildStats(dataToday);
-    showNowPrice(dataToday);
+    // Graphiques
+    chartTodayRef = drawChartOn("chartToday", dataToday);
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length){
+      chartTomorrowRef = drawChartOn("chartTomorrow", dataTomorrow);
+      document.getElementById("tomHint").style.display = "none";
+    } else {
+      // si non dispo, on vide le canvas de demain pour éviter une coquille
+      const c = document.getElementById("chartTomorrow").getContext("2d");
+      c.clearRect(0,0, c.canvas.width, c.canvas.height);
+    }
 
+    // Stats
+    const todayStats = buildStatsInto("statsToday", dataToday);
+    let tomorrowStats = null;
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length){
+      tomorrowStats = buildStatsInto("statsTomorrow", dataTomorrow);
+    } else {
+      document.getElementById("statsTomorrow").innerHTML =
+        `<h3>📊 Statistiques (demain)</h3><p class="muted">Données disponibles vers 18h.</p>`;
+    }
+
+    // Comparaison sous les stats (si demain dispo)
+    if (tomorrowStats){
+      const diff = +(tomorrowStats.avg - todayStats.avg).toFixed(3);
+      const sign = diff > 0 ? "+" : "";
+      const emoji = diff > 0 ? "🔺" : (diff < 0 ? "🟢" : "➖");
+      const text = `${emoji} Demain, le tarif moyen est ${sign}${diff} CHF/kWh ${diff>0?"plus cher":"moins cher"} qu’aujourd’hui.`;
+      const box = document.getElementById("compareBox");
+      box.textContent = text;
+      box.style.display = "block";
+    }
+
+    // Infos “prix bruts de demain” (secours texte)
     const demainDiv = document.getElementById('demain');
     if (Array.isArray(dataTomorrow) && dataTomorrow.length){
-      demainDiv.textContent = "✅ Les prix de demain sont disponibles sur l’API (intégrés au mode Nuit).";
+      demainDiv.textContent = "✅ Les prix de demain sont disponibles sur l’API (intégrés aussi dans le graphique et les stats).";
     } else {
       demainDiv.textContent = "Les prix de demain seront publiés vers 18h.";
     }
+
+    // prix actuel (pour l’entête)
+    showNowPrice(dataToday);
 
     // ▶️ (ré)attache le simulateur
     document.getElementById('btnPlan').addEventListener('click', planBest);
