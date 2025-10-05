@@ -51,6 +51,12 @@
 
   <div class="card">
     <canvas id="chart"></canvas>
+    <!-- Légende du tarif Double PLUS -->
+    <div id="tarifDoublePlus" class="muted" style="text-align:center; margin-top:8px">
+      🔸 <b>Tarif Double PLUS</b> — tracé orange constant<br>
+      🕖 Jour (07h00 → 21h00) → 31.65 ct/kWh (= 0.3165 CHF/kWh) •
+      🌙 Nuit (21h00 → 07h00) → 21.3 ct/kWh (= 0.213 CHF/kWh)
+    </div>
   </div>
 
   <div class="grid">
@@ -150,9 +156,7 @@
   let dataToday = [], dataTomorrow = [], chartRef = null;
 
   function chf(x){ return +(x/100).toFixed(3); }
-  function slotToObj(d){
-    return { t1: new Date(d.start_timestamp), t2: new Date(d.end_timestamp), p: chf(d.vario_plus) };
-  }
+  function slotToObj(d){ return { t1:new Date(d.start_timestamp), t2:new Date(d.end_timestamp), p:chf(d.vario_plus) }; }
 
   function drawChart(data){
     const labels = data.map(d => new Date(d.start_timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
@@ -162,48 +166,24 @@
     const yellow= prices.map(v => (v >= LOW && v <= HIGH) ? v : null);
     const red   = prices.map(v => (v > HIGH) ? v : null);
 
+    // Double PLUS: 07:00→21:00 = 0.3165, sinon 0.213
+    const doublePlus = data.map((d,i)=>{
+      const idx = i; // 15 min
+      return (idx >= 7*4 && idx < 21*4) ? 0.3165 : 0.213;
+    });
+
     const ctx = document.getElementById("chart").getContext("2d");
-    // ⚠️ IMPORTANT : pas de fill sur la ligne principale + pas de bordure sur couches colorées
     chartRef = new Chart(ctx, {
       type: "line",
       data: {
         labels,
         datasets: [
-          { // zones vertes
-            label:"<0.20",
-            data: green,
-            borderColor:"transparent",
-            borderWidth:0,
-            backgroundColor:"rgba(24,160,24,0.28)",
-            tension:0.25, pointRadius:0, fill:true, order:0
-          },
-          { // zones jaunes
-            label:"0.20–0.30",
-            data: yellow,
-            borderColor:"transparent",
-            borderWidth:0,
-            backgroundColor:"rgba(255,200,0,0.25)",
-            tension:0.25, pointRadius:0, fill:true, order:-1
-          },
-          { // zones rouges
-            label:">0.30",
-            data: red,
-            borderColor:"transparent",
-            borderWidth:0,
-            backgroundColor:"rgba(220,80,80,0.25)",
-            tension:0.25, pointRadius:0, fill:true, order:-2
-          },
-          { // ligne principale (bleue) SANS fill ⇒ supprime les lignes verticales parasites
-            label:"CHF/kWh",
-            data: prices,
-            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || "#0b6bff",
-            backgroundColor: "transparent",
-            tension: 0.25,
-            pointRadius: 3,
-            fill: false,
-            borderWidth: 2,
-            order: 10
-          }
+          { data: green, borderColor:"transparent", borderWidth:0, backgroundColor:"rgba(24,160,24,0.28)", tension:0.25, pointRadius:0, fill:true, order:0 },
+          { data: yellow,borderColor:"transparent", borderWidth:0, backgroundColor:"rgba(255,200,0,0.25)", tension:0.25, pointRadius:0, fill:true, order:-1 },
+          { data: red,   borderColor:"transparent", borderWidth:0, backgroundColor:"rgba(220,80,80,0.25)", tension:0.25, pointRadius:0, fill:true, order:-2 },
+          { label:"Tarif Double PLUS", data: doublePlus, borderColor:"orange", backgroundColor:"transparent", borderWidth:2, pointRadius:0, fill:false, tension:0, order:5 },
+          { label:"CHF/kWh", data: prices, borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || "#0b6bff",
+            backgroundColor:"transparent", tension:0.25, pointRadius:3, fill:false, borderWidth:2, order:10 }
         ]
       },
       options: {
@@ -218,14 +198,12 @@
           }
         },
         scales:{ y:{beginAtZero:true, title:{display:true,text:"CHF/kWh"}}, x:{title:{display:true,text:"Heure"}} },
-        // 🖱️ clic : déplace automatiquement le tooltip vers le nouveau point
         onClick:(evt, el, chart) => {
           const points = chart.getElementsAtEventForMode(evt,'nearest',{axis:'x',intersect:false},true);
           if (!points.length) return;
           const idx = points[0].index;
-          // on force l’activation sur la ligne principale (dernier dataset)
-          const baseDatasetIndex = chart.data.datasets.length - 1;
-          const active = [{ datasetIndex: baseDatasetIndex, index: idx }];
+          const base = chart.data.datasets.length - 1;
+          const active = [{ datasetIndex: base, index: idx }];
           chart.setActiveElements(active);
           chart.tooltip.setActiveElements(active);
           chart.update();
@@ -282,12 +260,14 @@
       const t18 = new Date(today); t18.setHours(18,0,0,0);
       const t24 = new Date(today); t24.setHours(24,0,0,0);
       const t07 = new Date(tomorrow); t07.setHours(7,0,0,0);
+
       const eve = allToday.filter(x => x.t1 >= t18 && x.t1 < t24);
       const morn= allTom.filter(x => x.t1 >= new Date(tomorrow) && x.t1 < t07);
       return eve.concat(morn);
     }
   }
 
+  // >>> VERSION COMPLÈTE (infos + tableau détaillé)
   function planBest(){
     const socNow = Math.max(0, Math.min(100, +document.getElementById('socNow').value || 0));
     const socTarget = Math.max(0, Math.min(100, +document.getElementById('socTarget').value || 80));
@@ -302,9 +282,12 @@
       return;
     }
 
-    const energyBattery = usable * (socTarget - socNow) / 100; // kWh visés dans la batterie
-    const energyAtPlug  = energyBattery / eff;                 // kWh à fournir à la prise
+    // énergie nécessaire côté PRISE (inclure pertes)
+    const energyBattery = usable * (socTarget - socNow) / 100; // kWh à stocker
+    const energyAtPlug  = energyBattery / eff;                 // kWh à fournir
     const slotKwh = power * 0.25; // 15 min
+
+    // nombre de slots requis
     const N = Math.ceil(energyAtPlug / slotKwh);
 
     const slots = allowedSlots(mode);
@@ -314,29 +297,36 @@
       return;
     }
 
+    // 2 stratégies
     let chosen = [];
     if (!wantContig){
+      // ÉPARS : on prend les N moins chers
       chosen = [...slots].sort((a,b)=>a.p-b.p).slice(0, N).sort((a,b)=>a.t1-b.t1);
     } else {
+      // CONTIGU : fenêtre glissante de N slots adjacents minimisant le coût moyen
       let bestAvg = Infinity, bestIdx = -1;
       for (let i=0; i+N<=slots.length; i++){
-        let sum=0; for (let k=0;k<N;k++) sum += slots[i+k].p;
+        let sum=0;
+        for (let k=0;k<N;k++) sum += slots[i+k].p;
         const avg = sum/N;
         if (avg < bestAvg){ bestAvg=avg; bestIdx=i; }
       }
       if (bestIdx>=0) chosen = slots.slice(bestIdx, bestIdx+N);
+      else chosen = []; // pas assez de slots
     }
 
     const kWhDelivered = Math.min(chosen.length*slotKwh, energyAtPlug);
     const cost = chosen.reduce((s,a)=> s + a.p * slotKwh, 0);
     const first = chosen[0]?.t1, last = chosen[chosen.length-1]?.t2;
 
+    // tableau détaillé
     const rows = slots.map(s=>{
       const cls = s.p<LOW ? 'low' : s.p>HIGH ? 'high' : 'mid';
       const used = chosen.includes(s) ? ' chosen' : '';
       return `<tr class="${cls}${used}"><td>${s.t1.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td>${s.p.toFixed(3)}</td></tr>`;
     }).join("");
 
+    // avertissement si incomplet (p.ex. demain manquant)
     let extra = "";
     if (chosen.length < N){
       extra = `<p class="bad">⚠️ Fenêtre incomplète (${N - chosen.length} créneau(x) manquant). Compléter sur la prochaine publication.</p>`;
@@ -356,7 +346,7 @@
         <details style="margin-top:8px">
           <summary>Voir la fenêtre complète & le détail des prix</summary>
           <table><tr><th>Début</th><th>Prix (CHF/kWh)</th></tr>${rows}</table>
-          <p class="muted">Les lignes <span class="low">vertes</span> &lt; ${LOW.toFixed(2)}, <span class="mid">jaunes</span> entre ${LOW.toFixed(2)}–${HIGH.toFixed(2)}, et <span class="high">rouges</span> &gt; ${HIGH.toFixed(2)}. Les lignes avec bordure sont les créneaux retenus.</p>
+          <p class="muted">Les lignes en <span class="low">vert</span> sont &lt; ${LOW.toFixed(2)}, <span class="mid">jaune</span> entre ${LOW.toFixed(2)}–${HIGH.toFixed(2)}, et <span class="high">rouge</span> &gt; ${HIGH.toFixed(2)}. Les lignes avec bordure sont les créneaux retenus.</p>
         </details>
       </div>
     `;
