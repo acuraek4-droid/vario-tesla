@@ -59,7 +59,8 @@
       <canvas id="chartToday"></canvas>
       <div class="muted center" style="margin-top:8px">
         🔸 <b>Tarif Double PLUS</b> — tracé orange constant<br>
-        🕖 Jour (07h00 → 21h00) → 0.3165 CHF/kWh • 🌙 Nuit (21h00 → 07h00) → 0.213 CHF/kWh
+        ⬆️ Haut tarif (07h00 → 12h00 et 17h00 → 23h00) → 0.2932 CHF/kWh<br>   
+	⬇️ Bas tarif (23h00 → 07h00 et 12h00 → 17h00) → 0.1927 CHF/kWh
       </div>
     </div>
 
@@ -193,8 +194,13 @@
     const yellow= prices.map(v => (v >= LOW && v <= HIGH) ? v : null);
     const red   = prices.map(v => (v > HIGH) ? v : null);
 
-    // Double PLUS 07:00→21:00 = 0.3165, sinon 0.213
-    const doublePlus = data.map((d,i)=> (i >= 7*4 && i < 21*4) ? 0.3165 : 0.213);
+   // Double PLUS 2026 : bas tarif 23:00→07:00 et 12:00→17:00 (0.1927), haut tarif sinon (0.2932)
+const doublePlus = data.map(d => {
+  const t = new Date(d.start_timestamp);
+  const h = t.getHours() + (t.getMinutes() / 60);
+  const isLow = (h >= 23 || h < 7) || (h >= 12 && h < 17);
+  return isLow ? 0.1927 : 0.2932;
+});
 
     const ctx = document.getElementById(canvasId).getContext("2d");
     const chart = new Chart(ctx, {
