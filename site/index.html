@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tarif VARIO — Groupe E</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root{
+    color-scheme: light;
+    --page:            #f9f9f7;
+    --surface:         #fcfcfb;
+    --surface-raised:  #ffffff;
+    --text-primary:    #0b0b0b;
+    --text-secondary:  #52514e;
+    --text-muted:      #898781;
+    --gridline:        #e1e0d9;
+    --baseline:        #c3c2b7;
+    --border:          rgba(11,11,11,0.10);
+    --border-strong:   rgba(11,11,11,0.16);
+
+    --accent:          #2a78d6;   /* prix spot — série 1 */
+    --accent-2:        #eb6834;   /* tarif Double PLUS — série 2 */
+    --select:          #1baf7a;   /* créneau retenu — série 3 */
+
+    --status-good:     #0ca30c;
+    --status-warning:  #fab219;
+    --status-critical: #d03b3b;
+    --status-good-text:#006300;
+
+    --zone-low-bg:     rgba(12,163,12,.09);
+    --zone-mid-bg:     rgba(250,178,25,.13);
+    --zone-high-bg:    rgba(208,59,59,.09);
+
+    --shadow: 0 1px 2px rgba(11,11,11,.04), 0 8px 24px -12px rgba(11,11,11,.12);
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --page:            #0d0d0d;
+      --surface:         #1a1a19;
+      --surface-raised:  #202020;
+      --text-primary:    #ffffff;
+      --text-secondary:  #c3c2b7;
+      --text-muted:      #898781;
+      --gridline:        #2c2c2a;
+      --baseline:        #383835;
+      --border:          rgba(255,255,255,0.10);
+      --border-strong:   rgba(255,255,255,0.18);
+
+      --accent:          #3987e5;
+      --accent-2:        #d95926;
+      --select:          #199e70;
+
+      --status-good:     #0ca30c;
+      --status-warning:  #fab219;
+      --status-critical: #d03b3b;
+      --status-good-text:#0ca30c;
+
+      --zone-low-bg:     rgba(12,163,12,.14);
+      --zone-mid-bg:     rgba(250,178,25,.16);
+      --zone-high-bg:    rgba(208,59,59,.14);
+
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  [data-theme="dark"]{
+    color-scheme: dark;
+    --page:            #0d0d0d;
+    --surface:         #1a1a19;
+    --surface-raised:  #202020;
+    --text-primary:    #ffffff;
+    --text-secondary:  #c3c2b7;
+    --text-muted:      #898781;
+    --gridline:        #2c2c2a;
+    --baseline:        #383835;
+    --border:          rgba(255,255,255,0.10);
+    --border-strong:   rgba(255,255,255,0.18);
+    --accent:          #3987e5;
+    --accent-2:        #d95926;
+    --select:          #199e70;
+    --status-good:     #0ca30c;
+    --status-warning:  #fab219;
+    --status-critical: #d03b3b;
+    --status-good-text:#0ca30c;
+    --zone-low-bg:     rgba(12,163,12,.14);
+    --zone-mid-bg:     rgba(250,178,25,.16);
+    --zone-high-bg:    rgba(208,59,59,.14);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family: system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+    background:var(--page); color:var(--text-primary);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 20px 48px; }
+
+  /* ---------- Header ---------- */
+  header.topbar{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in srgb, var(--page) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .topbar-inner{
+    max-width:1180px; margin:0 auto; padding:14px 20px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:36px; height:36px; border-radius:10px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg, var(--accent), var(--select));
+    font-size:1.05rem;
+  }
+  .brand-text h1{ margin:0; font-size:1.02rem; font-weight:700; letter-spacing:-.01em; }
+  .brand-text .sub{ margin:0; font-size:.78rem; color:var(--text-muted); }
+
+  .header-right{ display:flex; align-items:center; gap:10px; }
+  .now-pill{
+    display:flex; align-items:center; gap:8px;
+    background:var(--surface-raised); border:1px solid var(--border);
+    border-radius:999px; padding:6px 14px 6px 10px; box-shadow:var(--shadow);
+  }
+  .now-pill .dot{ width:9px; height:9px; border-radius:50%; background:var(--status-good); flex:none; }
+  .now-pill .val{ font-weight:700; font-variant-numeric: tabular-nums; }
+  .now-pill .lbl{ font-size:.72rem; color:var(--text-muted); }
+
+  #themeBtn{
+    width:38px; height:38px; border-radius:10px; flex:none; padding:0;
+    display:flex; align-items:center; justify-content:center; font-size:1.05rem;
+    background:var(--surface-raised); color:var(--text-primary);
+    border:1px solid var(--border); box-shadow:var(--shadow); cursor:pointer;
+  }
+  #themeBtn:hover{ border-color:var(--border-strong); }
+
+  .updated-line{ font-size:.78rem; color:var(--text-muted); padding:8px 20px 0; max-width:1180px; margin:0 auto; }
+
+  /* ---------- Layout ---------- */
+  h2.section-title{ font-size:.92rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-secondary); margin:32px 2px 12px; }
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:18px 20px;
+  }
+  .grid2{ display:grid; gap:16px; grid-template-columns:1fr; }
+  @media(min-width:920px){ .grid2{ grid-template-columns:1fr 1fr; } }
+  .full{ grid-column:1 / -1; }
+  canvas{ width:100% !important; height:auto !important; }
+
+  /* ---------- KPI tiles ---------- */
+  .kpi-row{ display:grid; gap:12px; grid-template-columns:repeat(auto-fit, minmax(158px,1fr)); }
+  .stat-tile{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:14px 16px; box-shadow:var(--shadow);
+  }
+  .stat-tile .label{ font-size:.74rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
+  .stat-tile .value{ font-size:1.5rem; font-weight:700; letter-spacing:-.01em; display:flex; align-items:baseline; gap:6px; }
+  .stat-tile .value small{ font-size:.85rem; font-weight:600; color:var(--text-secondary); }
+  .stat-tile .sub{ margin-top:4px; font-size:.78rem; color:var(--text-muted); }
+  .stat-tile .sub.good{ color:var(--status-good-text); }
+  .stat-tile .sub.bad{ color:var(--status-critical); }
+  .zone-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .zone-dot.low{ background:var(--status-good); }
+  .zone-dot.mid{ background:var(--status-warning); }
+  .zone-dot.high{ background:var(--status-critical); }
+
+  /* ---------- Chart card ---------- */
+  .chart-card h3{ margin:0 0 2px; font-size:.98rem; font-weight:700; text-transform:capitalize; }
+  .chart-legend{ display:flex; flex-wrap:wrap; gap:14px; margin:8px 0 14px; }
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-secondary); }
+  .legend-swatch{ width:16px; height:3px; border-radius:2px; flex:none; }
+  .zone-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip{ display:flex; align-items:center; gap:6px; font-size:.74rem; color:var(--text-secondary); background:color-mix(in srgb, var(--surface) 60%, transparent); border:1px solid var(--border); border-radius:999px; padding:3px 10px 3px 8px; }
+  .chip .zone-dot{ width:8px; height:8px; }
+  .hint{ font-size:.82rem; color:var(--text-muted); margin-top:10px; text-align:center; }
+
+  /* ---------- Tables ---------- */
+  table{ width:100%; border-collapse:collapse; font-variant-numeric: tabular-nums; }
+  th,td{ padding:7px 8px; border-bottom:1px solid var(--gridline); text-align:right; font-size:.86rem; }
+  th{ text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); font-weight:600; }
+  td:first-child, th:first-child{ text-align:left; }
+  tr.section-row th{ padding-top:14px; border-bottom:1px solid var(--border); }
+  .row-badge{ display:inline-flex; align-items:center; gap:6px; }
+  tr.chosen td{ box-shadow: inset 0 -2px 0 var(--select); }
+  .stats-avg{ display:flex; align-items:center; gap:8px; margin:2px 0 14px; font-size:.9rem; }
+  .stats-avg b{ font-size:1.05rem; }
+
+  /* ---------- Compare banner ---------- */
+  #compareBox{ display:flex; align-items:center; justify-content:center; gap:10px; font-weight:600; padding:14px; }
+
+  /* ---------- Simulator ---------- */
+  .sim-head{ display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:4px;}
+  .sim-head h3{ margin:0; font-size:1.02rem; }
+  .sim-head p{ margin:0; font-size:.84rem; color:var(--text-muted); }
+  .field-grid{ display:grid; gap:12px; grid-template-columns:repeat(2,1fr); margin-top:14px; }
+  @media(min-width:640px){ .field-grid.cols-4{ grid-template-columns:repeat(4,1fr); } }
+  label{ font-size:.78rem; color:var(--text-secondary); display:block; margin-bottom:5px; font-weight:600; }
+  input[type=number], select{
+    width:100%; padding:10px 11px; border-radius:10px; border:1px solid var(--border-strong);
+    background:var(--surface-raised); color:var(--text-primary); font-size:.92rem;
+  }
+  input[type=number]:focus, select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .check{ display:flex; align-items:center; gap:8px; margin-top:14px; font-size:.86rem; color:var(--text-secondary); }
+  .check input{ width:16px; height:16px; }
+  .sim-actions{ margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .btn{
+    background:var(--accent); color:#fff; border:0; padding:11px 18px; border-radius:10px;
+    font-weight:700; font-size:.9rem; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .btn:hover{ filter:brightness(1.06); }
+  .thresholds{ font-size:.78rem; color:var(--text-muted); }
+
+  .plan-result{ margin-top:16px; border-top:1px solid var(--border); padding-top:16px; }
+  .plan-kpis{ display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); margin-bottom:14px; }
+  .plan-kpis .stat-tile .value{ font-size:1.15rem; }
+  .plan-window{ font-size:.92rem; margin-bottom:6px; }
+  details summary{ cursor:pointer; font-size:.86rem; color:var(--accent); font-weight:600; margin-top:6px; }
+  details table{ margin-top:10px; }
+
+  .muted{ color:var(--text-muted); }
+  .good{ color:var(--status-good-text); font-weight:600; }
+  .bad{ color:var(--status-critical); font-weight:600; }
+
+  footer{ text-align:center; font-size:.76rem; color:var(--text-muted); margin-top:36px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">⚡</div>
+      <div class="brand-text">
+        <h1>Tarif VARIO — Groupe E</h1>
+        <p class="sub" id="dateJour">—</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="now-pill">
+        <span class="dot" id="nowDot"></span>
+        <span class="val" id="nowVal">—</span>
+        <span class="lbl">CHF/kWh</span>
+      </div>
+      <button id="themeBtn" title="Changer le thème">🌓</button>
+    </div>
+  </div>
+  <div class="updated-line" id="lastUpdate">Chargement…</div>
+</header>
+
+<div class="wrap">
+
+  <h2 class="section-title">Vue d'ensemble</h2>
+  <div class="kpi-row" id="kpiRow">
+    <div class="stat-tile"><div class="label">Prix actuel</div><div class="value">—</div></div>
+    <div class="stat-tile"><div class="label">Moyenne aujourd'hui</div><div class="value">—</div></div>
+    <div class="stat-tile"><div class="label">Le moins cher</div><div class="value">—</div></div>
+    <div class="stat-tile"><div class="label">Le plus cher</div><div class="value">—</div></div>
+    <div class="stat-tile" id="kpiTomorrow"><div class="label">Vs. demain</div><div class="value">—</div></div>
+  </div>
+
+  <h2 class="section-title">Courbes de prix</h2>
+  <div class="grid2">
+    <div class="card chart-card">
+      <h3 id="titleToday">Aujourd'hui</h3>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Prix Vario (spot)</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--accent-2)"></span>Tarif Double PLUS</span>
+      </div>
+      <canvas id="chartToday" height="220"></canvas>
+      <div class="zone-chips">
+        <span class="chip"><span class="zone-dot low"></span>&lt; 0.20 CHF/kWh</span>
+        <span class="chip"><span class="zone-dot mid"></span>0.20 – 0.30 CHF/kWh</span>
+        <span class="chip"><span class="zone-dot high"></span>&gt; 0.30 CHF/kWh</span>
+      </div>
+      <div class="hint">Double PLUS : 0.2932 CHF/kWh (07h–12h, 17h–23h) · 0.1927 CHF/kWh (23h–07h, 12h–17h)</div>
+    </div>
+
+    <div class="card chart-card">
+      <h3 id="titleTomorrow">Demain</h3>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Prix Vario (spot)</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--accent-2)"></span>Tarif Double PLUS</span>
+      </div>
+      <canvas id="chartTomorrow" height="220"></canvas>
+      <div class="hint" id="tomHint">En attente de publication (~18h). La courbe s'affiche automatiquement dès que disponible.</div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Statistiques détaillées</h2>
+  <div class="grid2">
+    <div class="card" id="statsToday"></div>
+    <div class="card" id="statsTomorrow"></div>
+  </div>
+
+  <h2 class="section-title">Simulateur de charge — Tesla</h2>
+  <div class="card full">
+    <div class="sim-head">
+      <h3>⚡ Meilleur créneau de recharge</h3>
+      <p>Calcule durée, coût et créneau optimal selon le tarif Vario</p>
+    </div>
+
+    <div class="field-grid cols-4">
+      <div>
+        <label for="socNow">% batterie actuel</label>
+        <input id="socNow" type="number" min="0" max="100" value="27" />
+      </div>
+      <div>
+        <label for="socTarget">Objectif %</label>
+        <input id="socTarget" type="number" min="10" max="100" value="80" />
+      </div>
+      <div>
+        <label for="powerKw">Puissance chargeur (kW)</label>
+        <input id="powerKw" type="number" step="0.1" min="1" value="11" />
+      </div>
+      <div>
+        <label for="usableKwh">Capacité utilisable (kWh)</label>
+        <input id="usableKwh" type="number" step="0.1" min="40" value="78" />
+      </div>
+    </div>
+
+    <div class="field-grid" style="margin-top:12px">
+      <div>
+        <label for="eff">Rendement (pertes)</label>
+        <select id="eff">
+          <option value="0.93" selected>93 %</option>
+          <option value="0.95">95 %</option>
+          <option value="0.90">90 %</option>
+        </select>
+      </div>
+      <div>
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="day" selected>Optimiser aujourd'hui (00:00→24:00)</option>
+          <option value="night">Recharge de nuit (18:00→07:00)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="check">
+      <input id="contig" type="checkbox" />
+      <label for="contig" style="margin:0">Préférer une fenêtre continue (au lieu de créneaux épars)</label>
+    </div>
+
+    <div class="sim-actions">
+      <button class="btn" id="btnPlan">Calculer le meilleur créneau</button>
+      <span class="thresholds">Seuils : <b style="color:var(--status-good-text)">&lt; 0.20</b> vert · <b style="color:#a67c00">0.20 – 0.30</b> jaune · <b style="color:var(--status-critical)">&gt; 0.30</b> rouge (CHF/kWh)</span>
+    </div>
+
+    <div id="planOut"></div>
+  </div>
+
+  <h2 class="section-title">Prix bruts de demain</h2>
+  <div class="card full">
+    <div id="demain" class="muted">Les prix de demain sont publiés vers 18h. Cette section se remplit automatiquement si disponible.</div>
+  </div>
+
+  <footer>Tarif VARIO · Données Groupe E · Actualisé automatiquement</footer>
+</div>
+
+<script>
+(function(){
+  // ---------- Thème clair / sombre ----------
+  const tBtn = document.getElementById('themeBtn');
+  function applyStoredTheme(){
+    // Pas de stockage navigateur : on suit le système par défaut,
+    // le bouton permet de forcer un mode pour la session en cours.
+  }
+  tBtn.addEventListener('click', () => {
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme');
+    if (current === 'dark'){ root.setAttribute('data-theme','light'); }
+    else if (current === 'light'){ root.setAttribute('data-theme','dark'); }
+    else {
+      const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.setAttribute('data-theme', isSystemDark ? 'light' : 'dark');
+    }
+    // redessine les graphiques pour reprendre les couleurs du nouveau thème
+    if (chartTodayRef) { chartTodayRef.destroy(); chartTodayRef = drawChartOn("chartToday", dataToday); }
+    if (chartTomorrowRef) { chartTomorrowRef.destroy(); chartTomorrowRef = drawChartOn("chartTomorrow", dataTomorrow); }
+  });
+
+  const LOW = 0.20, HIGH = 0.30; // seuils couleurs
+  const YMAX = 0.40;             // même échelle pour comparer
+
+  // ========================================================================
+  const prettyDate = d => d.toLocaleDateString('fr-CH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+  function pricesFile(day) {
+    const month = String(day.getMonth() + 1).padStart(2, '0');
+    const date = String(day.getDate()).padStart(2, '0');
+    return day.getFullYear() + '-' + month + '-' + date + '.json';
+  }
+
+  const apiToday = pricesFile(today);
+  const apiTomorrow = pricesFile(tomorrow);
+
+  document.getElementById("dateJour").textContent = prettyDate(today);
+  document.getElementById("titleToday").textContent = prettyDate(today);
+  document.getElementById("titleTomorrow").textContent = prettyDate(tomorrow);
+
+  let dataToday = [], dataTomorrow = [], chartTodayRef=null, chartTomorrowRef=null;
+
+  function chf(x){ return +x.toFixed(3); }
+
+  function slotToObj(d){
+    let val = 0;
+    if (d.integrated && d.integrated.length > 0) val = d.integrated[0].value;
+    else if (d.vario_plus) val = d.vario_plus;
+    if (val > 2.0) val = val / 100; // centimes -> CHF
+    return { t1:new Date(d.start_timestamp), t2:new Date(d.end_timestamp), p:chf(val) };
+  }
+
+  function zoneOf(p){ return p < LOW ? 'low' : (p > HIGH ? 'high' : 'mid'); }
+  function zoneLabel(z){ return z==='low' ? 'bas' : (z==='high' ? 'élevé' : 'moyen'); }
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  // ==== Crosshair plugin (couche d'interaction) ====
+  const crosshair = {
+    id: 'crosshair',
+    afterDraw(chart){
+      const active = chart.tooltip && chart.tooltip._active;
+      if (!active || !active.length) return;
+      const x = active[0].element.x;
+      const {top, bottom} = chart.chartArea;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = cssVar('--baseline');
+      ctx.setLineDash([4,4]);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  // ==== DESSIN GRAPHIQUE GÉNÉRIQUE ====
+  function drawChartOn(canvasId, data){
+    const labels = data.map(d => new Date(d.start_timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+    const prices = data.map(d => slotToObj(d).p);
+
+    const green = prices.map(v => (v < LOW) ? v : null);
+    const yellow= prices.map(v => (v >= LOW && v <= HIGH) ? v : null);
+    const red   = prices.map(v => (v > HIGH) ? v : null);
+
+    // Double PLUS : bas tarif 23:00→07:00 et 12:00→17:00 (0.1927), haut tarif sinon (0.2932)
+    const doublePlus = data.map(d => {
+      const t = new Date(d.start_timestamp);
+      const h = t.getHours() + (t.getMinutes() / 60);
+      const isLow = (h >= 23 || h < 7) || (h >= 12 && h < 17);
+      return isLow ? 0.1927 : 0.2932;
+    });
+
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { data: green,  borderColor:"transparent", borderWidth:0, backgroundColor: cssVar('--zone-low-bg'),  tension:0.25, pointRadius:0, fill:true, order:0 },
+          { data: yellow, borderColor:"transparent", borderWidth:0, backgroundColor: cssVar('--zone-mid-bg'),  tension:0.25, pointRadius:0, fill:true, order:-1 },
+          { data: red,    borderColor:"transparent", borderWidth:0, backgroundColor: cssVar('--zone-high-bg'), tension:0.25, pointRadius:0, fill:true, order:-2 },
+          { label:"Tarif Double PLUS", data: doublePlus, borderColor: cssVar('--accent-2'), backgroundColor:"transparent", borderWidth:2, pointRadius:0, fill:false, tension:0, order:5 },
+          { label:"Prix Vario", data: prices, borderColor: cssVar('--accent'),
+            backgroundColor:"transparent", tension:0.25, pointRadius:0, pointHoverRadius:6, pointHoverBackgroundColor: cssVar('--accent'),
+            fill:false, borderWidth:2, order:10 }
+        ]
+      },
+      options: {
+        interaction:{ mode:'nearest', axis:'x', intersect:false },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{
+            enabled:true, mode:'nearest', intersect:false,
+            backgroundColor: cssVar('--surface-raised'),
+            titleColor: cssVar('--text-primary'),
+            bodyColor: cssVar('--text-secondary'),
+            borderColor: cssVar('--border'),
+            borderWidth:1, padding:10, cornerRadius:8, displayColors:true,
+            callbacks:{ label:(c)=>` ${c.dataset.label || ''}: ${c.parsed.y.toFixed(3)} CHF/kWh` }
+          }
+        },
+        scales:{
+          y:{ beginAtZero:true, suggestedMax:YMAX, max:YMAX, title:{display:true,text:"CHF/kWh", color: cssVar('--text-muted')},
+              grid:{ color: cssVar('--gridline'), drawBorder:false }, ticks:{ color: cssVar('--text-muted') } },
+          x:{ title:{display:true,text:"Heure", color: cssVar('--text-muted')},
+              grid:{ display:false }, ticks:{ color: cssVar('--text-muted'), maxRotation:0, autoSkip:true } }
+        },
+        onClick:(evt, el, chart) => {
+          const points = chart.getElementsAtEventForMode(evt,'nearest',{axis:'x',intersect:false},true);
+          if (!points.length) return;
+          const idx = points[0].index;
+          const base = chart.data.datasets.length - 1;
+          const active = [{ datasetIndex: base, index: idx }];
+          chart.setActiveElements(active);
+          chart.tooltip.setActiveElements(active, {x:0,y:0});
+          chart.update();
+        }
+      },
+      plugins:[crosshair]
+    });
+    return chart;
+  }
+
+  // ==== STATS GÉNÉRIQUES (tableau) ====
+  function buildStatsInto(nodeId, data){
+    const arr = data.map(slotToObj);
+    const avg = +(arr.reduce((s,a)=>s+a.p,0) / arr.length).toFixed(3);
+    const sorted = [...arr].sort((a,b)=>a.p-b.p);
+    const top3 = sorted.slice(0,3);
+    const worst3 = sorted.slice(-3).reverse();
+    const under = arr.filter(x => x.p < LOW).sort((a,b)=>a.t1-b.t1);
+
+    const line = (x)=>x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const rowsFor = (items) => items.map(x => {
+      const z = zoneOf(x.p);
+      return `<tr><td><span class="row-badge"><span class="zone-dot ${z}"></span>${line(x.t1)}</span></td><td>${x.p.toFixed(3)}</td></tr>`;
+    }).join("");
+
+    let html = `<h3 style="margin-top:0">📊 Statistiques</h3>`;
+    html += `<div class="stats-avg"><span class="zone-dot" style="background:var(--accent)"></span>Moyenne : <b>${avg.toFixed(3)}</b> CHF/kWh</div>`;
+    html += `<table>`;
+    html += `<tr class="section-row"><th colspan="2">3 périodes les moins chères</th></tr>${rowsFor(top3)}`;
+    html += `<tr class="section-row"><th colspan="2">3 périodes les plus chères</th></tr>${rowsFor(worst3)}`;
+    html += `<tr class="section-row"><th colspan="2">Périodes sous ${LOW.toFixed(2)} CHF/kWh</th></tr>`;
+    html += under.length ? rowsFor(under) : `<tr><td colspan="2" class="muted">Aucune période sous ${LOW.toFixed(2)} CHF/kWh</td></tr>`;
+    html += `</table>`;
+    document.getElementById(nodeId).innerHTML = html;
+
+    return { avg, arr };
+  }
+
+  function fmtTime(d){ return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+
+  function buildKpis(statsToday){
+    const arr = statsToday.arr;
+    const sorted = [...arr].sort((a,b)=>a.p-b.p);
+    const min = sorted[0], max = sorted[sorted.length-1];
+    const tiles = document.querySelectorAll('#kpiRow .stat-tile');
+
+    // Le moins cher
+    tiles[2].innerHTML = `<div class="label">Le moins cher</div>
+      <div class="value">${min.p.toFixed(3)} <small>CHF/kWh</small></div>
+      <div class="sub">à ${fmtTime(min.t1)}</div>`;
+    // Le plus cher
+    tiles[3].innerHTML = `<div class="label">Le plus cher</div>
+      <div class="value">${max.p.toFixed(3)} <small>CHF/kWh</small></div>
+      <div class="sub">à ${fmtTime(max.t1)}</div>`;
+    // Moyenne
+    tiles[1].innerHTML = `<div class="label">Moyenne aujourd'hui</div>
+      <div class="value">${statsToday.avg.toFixed(3)} <small>CHF/kWh</small></div>`;
+  }
+
+  function showNowPrice(data){
+    const nowMs = Date.now();
+    const slot = data.find(d => {
+      const a = new Date(d.start_timestamp).getTime();
+      const b = new Date(d.end_timestamp).getTime();
+      return nowMs >= a && nowMs < b;
+    });
+    const obj = slot ? slotToObj(slot) : null;
+    const priceNow = obj ? obj.p.toFixed(3) : "—";
+    const z = obj ? zoneOf(obj.p) : 'mid';
+
+    document.getElementById("lastUpdate").textContent =
+      `Dernière mise à jour : ${new Date().toLocaleTimeString()}`;
+
+    document.getElementById("nowVal").textContent = priceNow;
+    document.getElementById("nowDot").style.background = `var(--status-${z==='low'?'good':(z==='high'?'critical':'warning')})`;
+
+    const tiles = document.querySelectorAll('#kpiRow .stat-tile');
+    tiles[0].innerHTML = `<div class="label">Prix actuel</div>
+      <div class="value"><span class="zone-dot ${z}"></span>&nbsp;${priceNow} <small>CHF/kWh</small></div>
+      <div class="sub">tarif ${zoneLabel(z)}</div>`;
+  }
+
+  // --- Simulateur : fenêtres jour/nuit 18→07 + continu/épars ---
+  function allowedSlots(mode){
+    const allToday = dataToday.map(slotToObj);
+    const allTom   = Array.isArray(dataTomorrow) ? dataTomorrow.map(slotToObj) : [];
+
+    if (mode === "day"){
+      return allToday;
+    } else {
+      const t18 = new Date(today); t18.setHours(18,0,0,0);
+      const t24 = new Date(today); t24.setHours(24,0,0,0);
+      const t07 = new Date(tomorrow); t07.setHours(7,0,0,0);
+      const eve = allToday.filter(x => x.t1 >= t18 && x.t1 < t24);
+      const morn= allTom.filter(x => x.t1 >= new Date(tomorrow) && x.t1 < t07);
+      return eve.concat(morn);
+    }
+  }
+
+  function planBest(){
+    const socNow = Math.max(0, Math.min(100, +document.getElementById('socNow').value || 0));
+    const socTarget = Math.max(0, Math.min(100, +document.getElementById('socTarget').value || 80));
+    const power = Math.max(1, +document.getElementById('powerKw').value || 11);
+    const usable = Math.max(40, +document.getElementById('usableKwh').value || 78);
+    const eff = Math.max(0.80, Math.min(0.99, +document.getElementById('eff').value || 0.93));
+    const mode = document.getElementById('mode').value;
+    const wantContig = document.getElementById('contig').checked;
+
+    if (socTarget <= socNow){
+      document.getElementById('planOut').innerHTML = `<div class="plan-result"><p class="good">✓ La batterie est déjà ≥ l'objectif.</p></div>`;
+      return;
+    }
+
+    const energyBattery = usable * (socTarget - socNow) / 100;
+    const energyAtPlug  = energyBattery / eff;
+    const slotKwh = power * 0.25;
+    const N = Math.ceil(energyAtPlug / slotKwh);
+
+    const slots = allowedSlots(mode);
+    if (!slots.length){
+      document.getElementById('planOut').innerHTML =
+        `<div class="plan-result"><p class="bad">⚠ Aucune donnée disponible pour cette fenêtre (ex. demain non publié avant ~18h).</p></div>`;
+      return;
+    }
+
+    let chosen = [];
+    if (!wantContig){
+      chosen = [...slots].sort((a,b)=>a.p-b.p).slice(0, N).sort((a,b)=>a.t1-b.t1);
+    } else {
+      let bestAvg = Infinity, bestIdx = -1;
+      for (let i=0; i+N<=slots.length; i++){
+        let sum=0;
+        for (let k=0;k<N;k++) sum += slots[i+k].p;
+        const avg = sum/N;
+        if (avg < bestAvg){ bestAvg=avg; bestIdx=i; }
+      }
+      if (bestIdx>=0) chosen = slots.slice(bestIdx, bestIdx+N);
+      else chosen = [];
+    }
+
+    const kWhDelivered = Math.min(chosen.length*slotKwh, energyAtPlug);
+    const cost = chosen.reduce((s,a)=> s + a.p * slotKwh, 0);
+    const first = chosen[0]?.t1, last = chosen[chosen.length-1]?.t2;
+
+    const rows = slots.map(s=>{
+      const z = zoneOf(s.p);
+      const used = chosen.includes(s) ? ' chosen' : '';
+      return `<tr class="${used}"><td><span class="row-badge"><span class="zone-dot ${z}"></span>${s.t1.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></td><td>${s.p.toFixed(3)}</td></tr>`;
+    }).join("");
+
+    let extra = "";
+    if (chosen.length < N){
+      extra = `<p class="bad" style="margin-top:8px">⚠ Fenêtre incomplète (${N - chosen.length} créneau(x) manquant). Complétez à la prochaine publication.</p>`;
+    }
+
+    document.getElementById('planOut').innerHTML = `
+      <div class="plan-result">
+        <p class="muted" style="margin-top:0"><b style="color:var(--text-primary)">${mode==="night"?"Nuit 18:00→07:00":"Jour 00:00→24:00"}</b> · ${wantContig?"fenêtre continue":"créneaux les moins chers"}</p>
+        <div class="plan-kpis">
+          <div class="stat-tile"><div class="label">Énergie visée</div><div class="value">${energyBattery.toFixed(1)} <small>kWh</small></div><div class="sub">${energyAtPlug.toFixed(1)} kWh à la prise (${Math.round(eff*100)}%)</div></div>
+          <div class="stat-tile"><div class="label">Créneaux requis</div><div class="value">${N} <small>× 15 min</small></div><div class="sub">${slotKwh.toFixed(2)} kWh / créneau</div></div>
+          <div class="stat-tile"><div class="label">Énergie livrée</div><div class="value">${kWhDelivered.toFixed(1)} <small>kWh</small></div></div>
+          <div class="stat-tile"><div class="label">Coût estimé</div><div class="value">${cost.toFixed(2)} <small>CHF</small></div></div>
+        </div>
+        <div class="plan-window">🕐 Fenêtre recommandée : <b>${first?first.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):"—"} → ${last?last.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):"—"}</b></div>
+        ${extra}
+        <details>
+          <summary>Voir la fenêtre complète &amp; le détail des prix</summary>
+          <table><tr><th>Début</th><th>Prix (CHF/kWh)</th></tr>${rows}</table>
+          <p class="muted" style="font-size:.78rem">Créneaux <span class="row-badge"><span class="zone-dot low"></span>verts</span> &lt; ${LOW.toFixed(2)}, <span class="row-badge"><span class="zone-dot mid"></span>jaunes</span> ${LOW.toFixed(2)}–${HIGH.toFixed(2)}, <span class="row-badge"><span class="zone-dot high"></span>rouges</span> &gt; ${HIGH.toFixed(2)}. Un trait souligne les créneaux retenus.</p>
+        </details>
+      </div>
+    `;
+  }
+
+  // charge données + init
+  Promise.all([
+    fetch(apiToday, {cache:'no-store'}).then(r => {
+      if (!r.ok) throw new Error('Tarifs du jour indisponibles');
+      return r.json();
+    }),
+    fetch(apiTomorrow, {cache:'no-store'}).then(r=> r.ok ? r.json() : [] )
+  ]).then(([d1,d2])=>{
+    dataToday = (d1.prices) ? d1.prices : (Array.isArray(d1) ? d1 : []);
+    dataTomorrow = (d2.prices) ? d2.prices : (Array.isArray(d2) ? d2 : []);
+
+    chartTodayRef = drawChartOn("chartToday", dataToday);
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length){
+      chartTomorrowRef = drawChartOn("chartTomorrow", dataTomorrow);
+      document.getElementById("tomHint").style.display = "none";
+    } else {
+      const c = document.getElementById("chartTomorrow").getContext("2d");
+      c.clearRect(0,0, c.canvas.width, c.canvas.height);
+    }
+
+    const todayStats = buildStatsInto("statsToday", dataToday);
+    buildKpis(todayStats);
+
+    let tomorrowStats = null;
+    const kpiTomorrow = document.getElementById('kpiTomorrow');
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length){
+      tomorrowStats = buildStatsInto("statsTomorrow", dataTomorrow);
+      const diff = +(tomorrowStats.avg - todayStats.avg).toFixed(3);
+      const sign = diff > 0 ? "+" : "";
+      const cls = diff > 0 ? 'bad' : (diff < 0 ? 'good' : '');
+      const emoji = diff > 0 ? "🔺" : (diff < 0 ? "🟢" : "➖");
+      kpiTomorrow.innerHTML = `<div class="label">Vs. demain</div>
+        <div class="value">${sign}${diff.toFixed(3)} <small>CHF/kWh</small></div>
+        <div class="sub ${cls}">${emoji} ${diff>0?"plus cher":(diff<0?"moins cher":"identique")} en moyenne</div>`;
+    } else {
+      document.getElementById("statsTomorrow").innerHTML =
+        `<h3 style="margin-top:0">📊 Statistiques (demain)</h3><p class="muted">Données disponibles vers 18h.</p>`;
+      kpiTomorrow.innerHTML = `<div class="label">Vs. demain</div><div class="value"><small>en attente</small></div><div class="sub">publication ~18h</div>`;
+    }
+
+    const demainDiv = document.getElementById('demain');
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length){
+      demainDiv.textContent = "✅ Les prix de demain sont disponibles sur l'API (intégrés aussi dans le graphique et les statistiques).";
+    } else {
+      demainDiv.textContent = "Les prix de demain seront publiés vers 18h.";
+    }
+
+    showNowPrice(dataToday);
+    document.getElementById('btnPlan').addEventListener('click', planBest);
+  }).catch(err=>{
+    document.getElementById("lastUpdate").textContent = "Erreur de chargement des données ⚠️";
+    console.error(err);
+  });
+})();
+</script>
+</body>
+</html>
